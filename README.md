@@ -1,116 +1,110 @@
-## Point of Sale
+# Point of Sale (POS)
 
-___
+A multi-business **Point of Sale** platform. It has two parts:
 
-### Table of Contents
+1. A **Laravel 8 backend** that serves a super-admin panel and a **JWT-secured REST API**.
+2. A **Vue.js client app** where business owners manage their branches, staff and inventory.
 
-1. [Folder Structure](#folder-structure)
-2. [Installation](#installation)
-    1. [Clone](#clone)
-    2. [Install Admin Panel](#install-admin-panel)
-    3. [Install Client Application](#install-client-app)
-3. [Run Application](#run-application)
-    1. [Admin Panel](#run-admin-panel)
-    1. [Client Application](#run-client-app)
+<!-- Team project: say who built it and what YOUR part was, for example:
+> Built as a team project during <program / course name>.
+> **My contributions:** <e.g. JWT auth, Branch & Vendor APIs, the repository/service layer, Dockerfile, Vue product pages>
+-->
 
-___
+<!-- Add screenshots: admin business list, client dashboard, product list -->
 
-### <a href="#folder-structure">Folder Structure</a>
+## Features
 
-   ```
-   ── point-of-sale         # Root directory.
-      ├── docs              # All useed themes and resources.
-      ├── PointOfSale       # Admin Panel and Customer Side API application.  
-      ├── pointofsaleview   # Customer View - Vue Application
-      └── README.md         # Documentation for the project.    
-   ```
+**Super-admin panel (Laravel + Blade, AdminLTE)**
+- Admin login, protected by an admin middleware
+- List, search, edit and delete businesses
+- Archive and unarchive businesses
+- Public landing page
 
-___
+**Business owner API (JWT)**
+- Register and log in to receive a JWT
+- Registration creates the owner account and their business in one **database transaction**, then sends a registration email
+- Full CRUD for **branches, employees, products, categories and vendors**
+- Vendor ↔ branch ownership lookups
 
-### <a href="#installation">Installation</a>
+**Client app (Vue.js, CoreUI)**
+- Login and registration
+- Dashboard
+- Pages to add, edit and list branches, employees, products and categories
 
-#### <a href="#clone-repository">Clone Repository</a>
+## Architecture
 
-```bash
-#Via HTTP:     
-https://github.com/devskill-dev/point-of-sale.git  
-#or, Via SSH:  
-git@github.com:devskill-dev/point-of-sale.git
+```
+point-of-sale/
+├── PointOfSale/          # Laravel 8 – admin panel + REST API
+│   └── app/
+│       ├── Http/Controllers/   # Admin/ (web) and User/ (API)
+│       ├── Http/Middleware/    # JwtMiddleware, AdminMiddleware
+│       ├── Http/Requests/      # Form Request validation per action
+│       ├── Services/           # Business logic (interface + implementation per domain)
+│       ├── Repository/         # Data access (interface + implementation per domain)
+│       ├── BusinessObjects/    # Domain objects passed between layers
+│       ├── ApiModels/          # Response models for the API
+│       └── ViewModels/         # Data for the Blade admin views
+├── pointofsaleview/      # Vue.js client (CoreUI template)
+└── docs/                 # UI themes used (AdminLTE, CoreUI, Arsha)
 ```
 
-___
+Requests pass through **Controller → Service → Repository**, and each layer depends on an interface. The REST API is protected by JWT middleware (`tymon/jwt-auth`), and the admin panel by a separate admin middleware.
 
-#### <a href="#install-admin-panel">Install Admin Panel</a>
+## API (prefix `/api`)
 
-Two Templates are used for **_<u>PointOfSale</u>_**. One for landing page, another foe main admin panel.  
-For admin panel we used **AdminLTE**  
-And, for landing page **Arsha** is used.
+| Method | Endpoint                                      | Description                      |
+|--------|-----------------------------------------------|----------------------------------|
+| POST   | `/register`                                   | Register a business owner        |
+| POST   | `/login`                                      | Log in and get a JWT             |
+| CRUD   | `/business/branch`                            | Branches                         |
+| CRUD   | `/business/employee`                          | Employees                        |
+| CRUD   | `/business/product`                           | Products                         |
+| CRUD   | `/business/category`                          | Categories                       |
+| CRUD   | `/business/vendor`                            | Vendors                          |
+| GET    | `/business/list`, `/business/brancheslist`, … | Lookups for the owner's data     |
 
-1. Navigate to `PointOfSale` folder
-   ```bash
-   cd PointOfSale
-   ```
-2. Install dependencies
-   ```bash
-   # 1. update and/or install php packages based on your system
-   composer update
-   # or just try to install
-   composer install
-   
-   # 2. install node packages
-   npm install
-   ```
-3. Create & Update `.env` file
-    1. ``` copy .env.example .env ```
-    2. Update application name
-    3. Generate app key `php artisan key:generate`
-    3. Create database for this application and update database connection section
-    4. Update mail sending credentials.
+All `/business/*` routes require the header `Authorization: Bearer <token>`.
 
+## Tech stack
 
-4. Create Tables and Seed with data
-   ```bash
-   php artisan migrate --seed
-   ```
-5. Generate & Publish JWT Secret Key
-   ```bash
-   php artisan vendor:publish --provider="Tymon\JWTAuth\Providers\LaravelServiceProvider"
-   php artisan jwt:secret
-   ```
+| Part     | Technology                                    |
+|----------|-----------------------------------------------|
+| Backend  | PHP 7.4, Laravel 8, JWT (`tymon/jwt-auth`), MySQL |
+| Admin UI | Blade, AdminLTE 3, Arsha (landing page)       |
+| Client   | Vue.js 2, CoreUI, Axios                       |
+| DevOps   | Docker (PHP-FPM image)                        |
 
-___
+## Getting started
 
-#### <a href="#install-client-app">Install Client App</a>
+### Backend & admin panel
 
-Client Application is based on _Vue.js_. We used **CoreUI** template as the base. The version used for the app is stored
-in docs.  
-It is stored in **_<u>pointofsaleview</u>_** folder.
+```bash
+cd PointOfSale
+composer install
+npm install
 
-**<u>Installation Steps</u>**
+cp .env.example .env
+php artisan key:generate
+# In .env: set the DB_* and MAIL_* values
 
-1. Navigate to `pointofsaleview` folder
-   ```bash
-   cd pointofsaleview
-   ```
-2. Install dependency via **yarn**
-   ```bash
-   yarn install
-   ```
+php artisan migrate --seed
+php artisan jwt:secret
 
-___
+php artisan serve          # http://localhost:8000 (admin: /admin)
+```
 
-### <a href="#run-application">Run Application</a>
+Or build the backend image with Docker:
 
-#### <a href="#run-admin-panel">Run Admin Panel</a>
+```bash
+cd PointOfSale
+docker build -t pos-backend .
+```
 
-   ```bash
-   php artisan serve
-   ```
+### Client app
 
-___
-
-#### <a href="#run-client-app">Run Client App</a>
-
-   ```bash
-   npm run serve
-   ```
+```bash
+cd pointofsaleview
+yarn install
+yarn serve                 # http://localhost:8080
+```
